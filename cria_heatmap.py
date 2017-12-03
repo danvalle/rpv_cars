@@ -45,6 +45,10 @@ print filename
 print 'AA:', acc_total / 25.
 print 'OA:', predicted_right / 1021.
 
+sum_rowsm = np.sum(m, axis=1)
+sum_rowsm[sum_rowsm == 0] = 1
+m = m / sum_rowsm[:, np.newaxis]
+
 #filename = 'input_example.csv'
 #data = np.loadtxt(filename, delimiter=';')
 data = m

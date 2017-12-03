@@ -1,51 +1,19 @@
-import h5py
-import numpy as np
-import sys
-
-from scipy.io import loadmat
-from sklearn import datasets
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import classification_report
-from sklearn.svm import SVC
-from sklearn.ensemble import VotingClassifier
 from collections import Counter
+import utils
+
+import numpy as np
+from sklearn.metrics import classification_report
+from sklearn.model_selection import GridSearchCV
+from sklearn.svm import SVC
 
 
+# manual definition of voting classifier, it takes into account every classifier with weight 1
 def vote(all_results):
     final_preds = []
     for i in range(len(all_results[0])):
-        counter = Counter([all_results[0][i],all_results[1][i],all_results[2][i]])
+        counter = Counter([all_results[0][i], all_results[1][i], all_results[2][i]])
         final_preds.append(counter.most_common(1)[0][0])
     return final_preds
-
-
-
-def load_cars(X_train_path, y_train_path, y_test_path, feature):
-    cars_train = h5py.File(X_train_path, 'r')
-    cars_train_X = cars_train[feature + '_train']
-    cars_test_X = cars_train[feature + '_test']
-    
-    cars_train = loadmat(y_train_path)['annotations']
-    cars_train_dict = {}
-    for i in range(len(cars_train[0])):
-        cars_train_dict[cars_train[0][i][5][0]] = cars_train[0][i][4][0][0]
-    cars_train_y = []
-    for car in sorted(cars_train_dict):
-        cars_train_y.append(cars_train_dict[car])    
-    cars_train_y = np.array(cars_train_y)
-
-    cars_test = loadmat(y_test_path)['annotations']
-    cars_test_dict = {}
-    for i in range(len(cars_test[0])):
-        cars_test_dict[cars_test[0][i][5][0]] = cars_test[0][i][4][0][0]
-    cars_test_y = []
-    for car in sorted(cars_test_dict):
-        cars_test_y.append(cars_test_dict[car])    
-    cars_test_y = np.array(cars_test_y)
-    
-    return cars_train_X, cars_test_X, cars_train_y, cars_test_y
-
 
 features = ['fc2', 'c5', 'fc2']
 trained_svms = []
@@ -55,7 +23,7 @@ for feature in features:
     y_test_path = 'devkit/cars_test_annos_withlabels.mat'
 
     # Loading the cars dataset features
-    cars_train_X, cars_test_X, cars_train_y, cars_test_y = load_cars(X_train_path, y_train_path, y_test_path, feature)
+    cars_train_X, cars_test_X, cars_train_y, cars_test_y = utils.load_cars(X_train_path, y_train_path, y_test_path, feature)
     cars_train_X = np.asarray(cars_train_X).reshape(cars_train_X.shape[0], np.prod(cars_train_X.shape[1:]))
     cars_test_X = np.asarray(cars_test_X).reshape(cars_test_X.shape[0], np.prod(cars_test_X.shape[1:]))
 
@@ -77,7 +45,7 @@ for feature in features:
     print()
 
     clf = GridSearchCV(SVC(kernel='linear'), tuned_parameters, cv=5,
-                       scoring=score, n_jobs=8)#'%s_macro' % score)
+                       scoring=score, n_jobs=8)  # '%s_macro' % score)
     clf.fit(cars_train_X, cars_train_y)
 
     print("Best parameters set found on development set:")

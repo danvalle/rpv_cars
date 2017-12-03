@@ -3,6 +3,7 @@ from scipy.io import loadmat
 import numpy as np
 
 
+# utility function to load the images h5
 def load_cars(X_train_path, y_train_path, y_test_path, feature):
     cars_train = h5py.File(X_train_path, 'r')
     cars_train_X = cars_train[feature + '_train']

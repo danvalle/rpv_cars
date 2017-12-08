@@ -1,27 +1,23 @@
-import pickle
-import utils
-
 import numpy as np
-from sklearn.metrics import classification_report
+import pickle
+import sys
+
+from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVC
+from utils import split_dataset
 
-feature = 'c5'
-X_train_path = feature + '_features.h5'
-y_train_path = 'cars_train_annos.mat'
-y_test_path = 'cars_test_annos_withlabels.mat'
+feature = sys.argv[1]
+X_path = feature + '_features.h5'
 
 # Loading the cars dataset features
-cars_train_X, cars_test_X, cars_train_y, cars_test_y = utils.load_cars(X_train_path, y_train_path, y_test_path, feature)
+test_size = 0.3
+cars_train_X, cars_test_X, cars_train_y, cars_test_y = split_dataset(X_path, feature, test_size)
 cars_train_X = np.asarray(cars_train_X).reshape(cars_train_X.shape[0], np.prod(cars_train_X.shape[1:]))
 cars_test_X = np.asarray(cars_test_X).reshape(cars_test_X.shape[0], np.prod(cars_test_X.shape[1:]))
 
-# To apply an classifier on this data, we need to flatten the image, to
-# turn the data in a (samples, feature) matrix:
-n_samples = cars_train_y.shape[0] + cars_test_y.shape[0]
-
 # Set the parameters by cross-validation
-tuned_parameters = [{'gamma': [1e-3, 1e-4],
+tuned_parameters = [{'gamma': [1e-3, 1e-4, 1e-5],
                      'C': [1, 10, 100, 1000]}]
 
 score = 'accuracy'  # , 'precision', 'recall']
@@ -54,6 +50,8 @@ print()
 y_true, y_pred = cars_test_y, clf.predict(cars_test_X)
 print(classification_report(y_true, y_pred))
 print()
+
+print confusion_matrix(y_true, y_pred)
 
 # save model for later use in plotting the heatmap
 filename = feature + '_model.sav'

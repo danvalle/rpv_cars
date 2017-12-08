@@ -1,16 +1,19 @@
-from glob import glob
-import os
-
 import h5py
+import numpy as np
+import os
+import sys
+
+from glob import glob
 from PIL import Image
+from scipy.io import loadmat
 from torch import cat
 from torch.autograd import Variable
 from torch.nn import Sequential
 from torchvision import transforms
 from torchvision.models import alexnet
+from utils import cars_downsample
 
 batch = 10
-
 
 # IF RUNNING WITHOUT A GPU, REMOVE ALL .cuda() FUNCTION CALLS BELOW
 class AlexNet:
@@ -35,12 +38,15 @@ class AlexNet:
 
 if __name__ == "__main__":
 
-    # pre-processing of the
-    preprocessFn = transforms.Compose([transforms.Scale(256),
-                                       transforms.CenterCrop(224),
-                                       transforms.ToTensor(),
-                                       transforms.Normalize(mean=[0.5, 0.5, 0.5],
-                                                            std=[0.5, 0.5, 0.5])])
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+
+    preprocess_img = transforms.Compose([
+            transforms.RandomSizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ])
 
     alex_modified = AlexNet()
 
@@ -49,91 +55,71 @@ if __name__ == "__main__":
         raise FileNotFoundError('Make sure train images are in ./cars_train/[].jpg and test images are in '
                                 './cars_test/[].jpg')
 
-    train_paths = sorted(glob('cars_train/*.jpg'))  # 8144 814*10, 4
-    test_paths = sorted(glob('cars_test/*.jpg'))  # 8041 804*10, 1
+    # downsampling on training cars dataset
+    labels_path = 'cars_train_annos.mat'
+    n = 25 # 25 classes * 40 samples = 1000 total samples
+    classes, samples = cars_downsample(labels_path, n)
 
+    X_samples = []
+    for sample in samples:
+    	X_samples += sample
+
+    X_paths = ['./cars_train/' + car for car in X_samples]
+    
     # saving each of the features in a different h5 file
-    c1_dataset = h5py.File('c1_features.h5', 'w')
-    c5_dataset = h5py.File('c5_features.h5', 'w')
-    fc2_dataset = h5py.File('fc2_features.h5', 'w')
+    c1_features = h5py.File('c1_features.h5', 'w')
+    c5_features = h5py.File('c5_features.h5', 'w')
+    fc2_features = h5py.File('fc2_features.h5', 'w')
 
-    # split them into test/train -> also, specify their sizes
-    c1_train_dataset = c1_dataset.create_dataset('c1_train', (batch, 64, 27, 27), maxshape=(None, 64, 27, 27))
-    c1_test_dataset = c1_dataset.create_dataset('c1_test', (batch, 64, 27, 27), maxshape=(None, 64, 27, 27))
+    c1_dataset = c1_features.create_dataset('c1', (batch, 64, 27, 27), maxshape=(None, 64, 27, 27))
+    c1_labels = c1_features.create_dataset('c1_labels', (batch, ), maxshape=(None, ))
+    c5_dataset = c5_features.create_dataset('c5', (batch, 256, 6, 6), maxshape=(None, 256, 6, 6))
+    c5_labels = c5_features.create_dataset('c5_labels', (batch, ), maxshape=(None, ))
+    fc2_dataset = fc2_features.create_dataset('fc2', (batch, 4096), maxshape=(None, 4096))
+    fc2_labels = fc2_features.create_dataset('fc2_labels', (batch, ), maxshape=(None, ))
 
-    c5_train_dataset = c5_dataset.create_dataset('c5_train', (batch, 256, 6, 6), maxshape=(None, 256, 6, 6))
-    c5_test_dataset = c5_dataset.create_dataset('c5_test', (batch, 256, 6, 6), maxshape=(None, 256, 6, 6))
+    # Saving features from Cars dataset
+    print("Saving features...")
+    new_size = 10
+    j = -1
+    for i in range(0, len(X_paths), batch):
 
-    fc2_train_dataset = fc2_dataset.create_dataset('fc2_train', (batch, 4096), maxshape=(None, 4096))
-    fc2_test_dataset = fc2_dataset.create_dataset('fc2_test', (batch, 4096), maxshape=(None, 4096))
-
-    # Saving training features from Cars dataset
-    print("Saving training features...")
-    for i in range(0, len(train_paths), batch):
-
-        if i >= 8140:  # train dataset size
-            new_size = i + 4
-        else:
-            new_size = i + batch
-
-        print(i + 1, 'to', new_size)
+        if not i % 40:
+        	j += 1
+        
+        print i + 1, 'to', new_size
 
         if i >= batch:
-            c1_train_dataset.resize(new_size, axis=0)
-            c5_train_dataset.resize(new_size, axis=0)
-            fc2_train_dataset.resize(new_size, axis=0)
-
-        if i >= 8140:
-            batch = 4
+            c1_dataset.resize(new_size, axis=0)
+            c1_labels.resize(new_size, axis=0)
+            c5_dataset.resize(new_size, axis=0)
+            c5_labels.resize(new_size, axis=0)
+            fc2_dataset.resize(new_size, axis=0)
+            fc2_labels.resize(new_size, axis=0)
 
         imgs = []
+        labels = []
 
-        for path in train_paths[i:new_size]:
-            # saves the img in tensor format, ready to be inputted in pytorch alexnet
-            imgs.append(preprocessFn(Image.open(path).convert('RGB')).unsqueeze(0))
+        for path in X_paths[i:new_size]:
+            # savepreprocess_imgs the img in tensor format, ready to be inputted in pytorch alexnet
+            imgs.append(preprocess_img(Image.open(path).convert('RGB')).unsqueeze(0))            
+            labels.append(classes[j])
 
-        inputImgs = Variable(cat(imgs)).cuda()
+        inputImgs = Variable(cat(imgs)).cuda()        
 
         c1, c5, fc2 = alex_modified.forward(inputImgs)
 
-        c1_train_dataset[-batch:] = c1.data.cpu().numpy()
-        c5_train_dataset[-batch:] = c5.data.cpu().numpy()
-        fc2_train_dataset[-batch:] = fc2.data.cpu().numpy()
+        labels = np.array(labels)
 
-    batch = 10
+        c1_dataset[-batch:] = c1.data.cpu().numpy()
+        c1_labels[-batch:] = labels
+        c5_dataset[-batch:] = c5.data.cpu().numpy()
+        c5_labels[-batch:] = labels
+        fc2_dataset[-batch:] = fc2.data.cpu().numpy()
+        fc2_labels[-batch:] = labels
 
-    # Saving testing features from Cars dataset
-    print("Saving testing features...")
-    for i in range(0, len(test_paths), batch):
+        new_size += batch
 
-        if i >= 8040:  # test dataset size
-            new_size = i + 1
-        else:
-            new_size = i + batch
-
-        print(i + 1, 'to', new_size)
-
-        if i >= batch:
-            c1_test_dataset.resize(new_size, axis=0)
-            c5_test_dataset.resize(new_size, axis=0)
-            fc2_test_dataset.resize(new_size, axis=0)
-
-        if i >= 8040:
-            batch = 1
-
-        imgs = []
-
-        for path in train_paths[i:new_size]:
-            imgs.append(preprocessFn(Image.open(path).convert('RGB')).unsqueeze(0))
-
-        inputImgs = Variable(cat(imgs)).cuda()
-
-        c1, c5, fc2 = alex_modified.forward(inputImgs)
-
-        c1_test_dataset[-batch:] = c1.data.cpu().numpy()
-        c5_test_dataset[-batch:] = c5.data.cpu().numpy()
-        fc2_test_dataset[-batch:] = fc2.data.cpu().numpy()
-
-    c1_dataset.close()
-    c5_dataset.close()
-    fc2_dataset.close()
+    c1_features.close()
+    c5_features.close()
+    fc2_features.close()

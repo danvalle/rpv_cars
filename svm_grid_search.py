@@ -34,32 +34,34 @@ clf.fit(cars_train_X, cars_train_y)
 print("Best parameters set found on development set:")
 print()
 print(clf.best_params_)
-# print()
+
 # print("Grid scores on development set:")
-# print()
 # means = clf.cv_results_['mean_test_score']
 # stds = clf.cv_results_['std_test_score']
 # for mean, std, params in zip(means, stds, clf.cv_results_['params']):
 #     print("%0.3f (+/-%0.03f) for %r"
 #           % (mean, std * 2, params))
-# print()
 
-# print("Detailed classification report:")
-# print()
-# print("The model is trained on the full development set.")
-# print("The scores are computed on the full evaluation set.")
-# print()
-# y_true, y_pred = cars_test_y, clf.predict(cars_test_X)
-# print(classification_report(y_true, y_pred))
-# print()
+y_true, y_pred = cars_test_y, clf.predict(cars_test_X)
+
+preds = {}
+for i in range(y_true.shape[0]):
+	if y_true[i] == y_pred[i]:
+		if y_true[i] not in preds:
+			preds[y_true[i]] = 1
+		else:
+			preds[y_true[i]] += 1
+for y in y_true:
+	if y not in preds:
+		preds[y] = 0
 
 conf_matrix = 1. * confusion_matrix(y_true, y_pred)
 conf_matrix /= np.sum(conf_matrix, axis=1)
-cria_map(conf_matrix, feature)
+cria_map(conf_matrix, preds.keys(), feature)
 
 print "OA:", accuracy_score(y_true, y_pred)
 print "AA:", np.trace(conf_matrix) / (1. * conf_matrix.shape[0])
 
 # save model for later use in plotting the heatmap
-filename = feature + '_model.sav'
-pickle.dump(clf, open(filename, 'wb'))
+#filename = feature + '_model.sav'
+#pickle.dump(clf, open(filename, 'wb'))

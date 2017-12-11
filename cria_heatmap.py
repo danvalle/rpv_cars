@@ -50,10 +50,10 @@ import pickle
 
 # filename = 'input_example.csv'
 #data = np.loadtxt(filename, delimiter=';')
-def cria_map(matrix, filename):
+def cria_map(matrix, classes, filename):
     data = matrix
 
-    desc = range(1, 26)  # ['Earth', 'Moon', 'Jupiter', 'Mars', 'Pluto', 'Saturn']
+    desc = classes  # ['Earth', 'Moon', 'Jupiter', 'Mars', 'Pluto', 'Saturn']
     # 
     strategy_path = []
     # 

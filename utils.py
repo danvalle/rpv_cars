@@ -21,3 +21,25 @@ def split_dataset(X_path, feature, test_size):
     cars_X = np.array(cars[feature])
     cars_y = np.array(cars[feature + '_labels'])
     return train_test_split(cars_X, cars_y, test_size=test_size, random_state=42)
+
+def split_dataset_fusions(test_size):
+    cars_c1_h5 = h5py.File('c1_features.h5', 'r')
+    cars_X_c1 = np.array(cars_c1_h5['c1'])
+    cars_y_c1 = np.array(cars_c1_h5['c1_labels'])
+    cars_c5_h5 = h5py.File('c5_features.h5', 'r')
+    cars_X_c5 = np.array(cars_c5_h5['c5'])
+    cars_y_c5 = np.array(cars_c5_h5['c5_labels'])
+    cars_fc2_h5 = h5py.File('fc2_features.h5', 'r')
+    cars_X_fc2 = np.array(cars_fc2_h5['fc2'])
+    cars_y_fc2 = np.array(cars_fc2_h5['fc2_labels'])
+
+    # shuffled array
+    shuffled_X = np.arange(cars_X_c1.shape[0])
+    shuffled_y = np.arange(cars_y_c1.shape[0])
+    indices_X_train, indices_X_test, indices_y_train, indices_y_test = train_test_split(shuffled_X, shuffled_y, test_size=test_size, random_state=42)
+    
+    cars_c1 = cars_X_c1[indices_X_train], cars_X_c1[indices_X_test], cars_y_c1[indices_y_train], cars_y_c1[indices_y_test]
+    cars_c5 = cars_X_c5[indices_X_train], cars_X_c5[indices_X_test], cars_y_c5[indices_y_train], cars_y_c5[indices_y_test]
+    cars_fc2 = cars_X_fc2[indices_X_train], cars_X_fc2[indices_X_test], cars_y_fc2[indices_y_train], cars_y_fc2[indices_y_test]
+
+    return cars_c1, cars_c5, cars_fc2
